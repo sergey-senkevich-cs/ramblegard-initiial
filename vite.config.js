@@ -9,5 +9,13 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src')
     }
+  },
+  define: {
+    global: 'globalThis',
+  },
+  build: {
+    rollupOptions: {
+      external: ['electron']
+    }
   }
 }) 

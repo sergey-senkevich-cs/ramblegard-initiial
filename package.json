@@ -1,7 +1,7 @@
 {
   "name": "rabmlegard-electron",
   "version": "1.0.0",
-  "description": "Electron + Vue.js application with Express.js and SQLite",
+  "description": "Electron + Vue.js application with SQLite database",
   "main": "electron/main.js",
   "homepage": "https://github.com/rabmlegard/electron-app",
   "scripts": {
@@ -9,8 +9,12 @@
     "build": "vite build",
     "electron": "electron .",
     "electron:dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
-    "start": "concurrently \"npm run server:dev\" \"npm run dev\"",
+    "electron:dev:watch": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && nodemon --exec electron . --watch electron/ --watch server/\"",
+    "app": "electron .",
+    "app:dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
+    "start": "npm run app",
     "electron:build": "vite build && electron-builder",
+    "server": "node server/index.js",
     "server:dev": "nodemon server/index.js",
     "preview": "vite preview"
   },
@@ -18,8 +22,8 @@
     "electron",
     "vue",
     "desktop",
-    "express",
-    "sqlite"
+    "sqlite",
+    "database"
   ],
   "author": "Rabmlegard Team <team@rabmlegard.com>",
   "license": "ISC",
@@ -65,8 +69,8 @@
     "wait-on": "^7.2.0"
   },
   "dependencies": {
-    "express": "^4.18.0",
     "sqlite3": "^5.1.6",
-    "cors": "^2.8.5"
+    "uuid": "^9.0.0"
   }
 }
+

@@ -1,179 +1,320 @@
-const express = require('express')
+const http = require('http')
 const sqlite3 = require('sqlite3').verbose()
-const cors = require('cors')
 const path = require('path')
+const { v4: uuidv4 } = require('uuid')
 
-const app = express()
 const PORT = 3001
-
-// Middleware
-app.use(cors())
-app.use(express.json())
-
-// Создание и подключение к базе данных SQLite
-const dbPath = path.join(__dirname, 'database.sqlite')
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Ошибка при подключении к базе данных:', err.message)
-  } else {
-    console.log('Подключено к SQLite базе данных')
-    initDatabase()
-  }
-})
+const DB_PATH = path.join(__dirname, 'database.sqlite')
 
 // Инициализация базы данных
 function initDatabase() {
-  // Создаем таблицу пользователей
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `)
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(DB_PATH, (err) => {
+      if (err) {
+        console.error('Ошибка подключения к базе данных:', err)
+        reject(err)
+        return
+      }
+      console.log('Подключение к SQLite базе данных установлено')
+    })
 
-  console.log('Таблицы базы данных инициализированы')
+    // Создание таблицы пользователей
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) {
+        console.error('Ошибка создания таблицы:', err)
+        reject(err)
+        return
+      }
+      console.log('Таблица пользователей готова')
+      resolve(db)
+    })
+  })
 }
 
-// API Routes
-
-// Получить всех пользователей
-app.get('/api/users', (req, res) => {
-  db.all('SELECT * FROM users ORDER BY created_at DESC', (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message })
-      return
-    }
-    res.json({ users: rows })
-  })
-})
-
-// Получить пользователя по ID
-app.get('/api/users/:id', (req, res) => {
-  const { id } = req.params
-  
-  db.get('SELECT * FROM users WHERE id = ?', [id], (err, row) => {
-    if (err) {
-      res.status(500).json({ error: err.message })
-      return
-    }
-    
-    if (!row) {
-      res.status(404).json({ error: 'Пользователь не найден' })
-      return
-    }
-    
-    res.json(row)
-  })
-})
-
-// Создать нового пользователя
-app.post('/api/users', (req, res) => {
-  const { name, email } = req.body
-  
-  if (!name || !email) {
-    return res.status(400).json({ error: 'Имя и email обязательны' })
-  }
-
-  db.run('INSERT INTO users (name, email) VALUES (?, ?)', [name, email], function(err) {
-    if (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
-        res.status(400).json({ error: 'Пользователь с таким email уже существует' })
+// Функции для работы с базой данных
+function getAllUsers(db) {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM users ORDER BY created_at DESC', (err, rows) => {
+      if (err) {
+        reject(err)
       } else {
-        res.status(400).json({ error: err.message })
+        resolve(rows)
       }
-      return
-    }
-    res.json({
-      id: this.lastID,
-      name,
-      email
     })
   })
-})
+}
 
-// Обновить пользователя
-app.put('/api/users/:id', (req, res) => {
-  const { id } = req.params
-  const { name, email } = req.body
-  
-  if (!name || !email) {
-    return res.status(400).json({ error: 'Имя и email обязательны' })
-  }
-
-  db.run('UPDATE users SET name = ?, email = ? WHERE id = ?', [name, email, id], function(err) {
-    if (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
-        res.status(400).json({ error: 'Пользователь с таким email уже существует' })
+function getUserById(db, id) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM users WHERE id = ?', [id], (err, row) => {
+      if (err) {
+        reject(err)
       } else {
-        res.status(400).json({ error: err.message })
+        resolve(row)
       }
-      return
-    }
-    
-    if (this.changes === 0) {
-      res.status(404).json({ error: 'Пользователь не найден' })
-      return
-    }
-    
-    res.json({
-      id: parseInt(id),
-      name,
-      email,
-      message: 'Пользователь обновлен'
     })
   })
-})
+}
 
-// Удалить пользователя
-app.delete('/api/users/:id', (req, res) => {
-  const { id } = req.params
-  
-  db.run('DELETE FROM users WHERE id = ?', [id], function(err) {
-    if (err) {
-      res.status(500).json({ error: err.message })
-      return
-    }
+function createUser(db, userData) {
+  return new Promise((resolve, reject) => {
+    const { name, email } = userData
+    const id = uuidv4()
     
-    if (this.changes === 0) {
-      res.status(404).json({ error: 'Пользователь не найден' })
-      return
-    }
-    
-    res.json({ 
-      message: 'Пользователь удален', 
-      changes: this.changes 
-    })
+    db.run('INSERT INTO users (id, name, email) VALUES (?, ?, ?)', 
+      [id, name, email], 
+      function(err) {
+        if (err) {
+          reject(err)
+        } else {
+          // Получаем созданного пользователя
+          db.get('SELECT * FROM users WHERE id = ?', [id], (err, row) => {
+            if (err) {
+              reject(err)
+            } else {
+              resolve(row)
+            }
+          })
+        }
+      })
   })
-})
+}
 
-// Статистика
-app.get('/api/stats', (req, res) => {
-  db.get('SELECT COUNT(*) as user_count FROM users', (err, userRow) => {
-    if (err) {
-      res.status(500).json({ error: err.message })
-      return
-    }
+function updateUser(db, id, userData) {
+  return new Promise((resolve, reject) => {
+    const { name, email } = userData
     
-    res.json({
-      users: userRow.user_count
+    db.run('UPDATE users SET name = ?, email = ? WHERE id = ?', 
+      [name, email, id], 
+      function(err) {
+        if (err) {
+          reject(err)
+        } else {
+          if (this.changes === 0) {
+            resolve(null) // Пользователь не найден
+          } else {
+            // Получаем обновленного пользователя
+            db.get('SELECT * FROM users WHERE id = ?', [id], (err, row) => {
+              if (err) {
+                reject(err)
+              } else {
+                resolve(row)
+              }
+            })
+          }
+        }
+      })
+  })
+}
+
+function deleteUser(db, id) {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM users WHERE id = ?', [id], function(err) {
+      if (err) {
+        reject(err)
+      } else {
+        resolve(this.changes)
+      }
     })
   })
-})
+}
+
+function getUsersCount(db) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT COUNT(*) as count FROM users', (err, row) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve(row.count)
+      }
+    })
+  })
+}
+
+// Обработка CORS
+function setCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+}
+
+// Парсинг JSON из тела запроса
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = ''
+    req.on('data', chunk => {
+      body += chunk.toString()
+    })
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {})
+      } catch (error) {
+        reject(error)
+      }
+    })
+  })
+}
+
+// Отправка JSON ответа
+function sendJson(res, statusCode, data) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' })
+  res.end(JSON.stringify(data))
+}
+
+// Создание HTTP сервера
+async function createServer() {
+  const db = await initDatabase()
+
+  const server = http.createServer(async (req, res) => {
+    setCorsHeaders(res)
+
+    // Обработка preflight запросов
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200)
+      res.end()
+      return
+    }
+
+    const url = new URL(req.url, `http://localhost:${PORT}`)
+    const pathname = url.pathname
+    const method = req.method
+
+    console.log(`${method} ${pathname}`)
+
+    try {
+      // Маршруты API
+      if (pathname === '/api/users' && method === 'GET') {
+        // Получить всех пользователей
+        const users = await getAllUsers(db)
+        sendJson(res, 200, { users })
+
+      } else if (pathname === '/api/users' && method === 'POST') {
+        // Создать пользователя
+        const body = await parseBody(req)
+        const { name, email } = body
+
+        if (!name || !email) {
+          sendJson(res, 400, { error: 'Имя и email обязательны' })
+          return
+        }
+
+        try {
+          const newUser = await createUser(db, { name, email })
+          sendJson(res, 201, newUser)
+        } catch (error) {
+          if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            sendJson(res, 400, { error: 'Пользователь с таким email уже существует' })
+          } else {
+            throw error
+          }
+        }
+
+      } else if (pathname.startsWith('/api/users/') && method === 'GET') {
+        // Получить пользователя по ID
+        const userId = pathname.split('/')[3]
+        const user = await getUserById(db, userId)
+
+        if (user) {
+          sendJson(res, 200, user)
+        } else {
+          sendJson(res, 404, { error: 'Пользователь не найден' })
+        }
+
+      } else if (pathname.startsWith('/api/users/') && method === 'PUT') {
+        // Обновить пользователя
+        const userId = pathname.split('/')[3]
+        const body = await parseBody(req)
+        const { name, email } = body
+
+        if (!name || !email) {
+          sendJson(res, 400, { error: 'Имя и email обязательны' })
+          return
+        }
+
+        try {
+          const updatedUser = await updateUser(db, userId, { name, email })
+          
+          if (updatedUser) {
+            sendJson(res, 200, { ...updatedUser, message: 'Пользователь обновлен' })
+          } else {
+            sendJson(res, 404, { error: 'Пользователь не найден' })
+          }
+        } catch (error) {
+          if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            sendJson(res, 400, { error: 'Пользователь с таким email уже существует' })
+          } else {
+            throw error
+          }
+        }
+
+      } else if (pathname.startsWith('/api/users/') && method === 'DELETE') {
+        // Удалить пользователя
+        const userId = pathname.split('/')[3]
+        const changes = await deleteUser(db, userId)
+
+        if (changes > 0) {
+          sendJson(res, 200, { message: 'Пользователь удален', changes })
+        } else {
+          sendJson(res, 404, { error: 'Пользователь не найден' })
+        }
+
+      } else if (pathname === '/api/stats' && method === 'GET') {
+        // Статистика
+        const userCount = await getUsersCount(db)
+        sendJson(res, 200, { users: userCount })
+
+      } else {
+        // 404 для неизвестных маршрутов
+        sendJson(res, 404, { error: 'Маршрут не найден' })
+      }
+
+    } catch (error) {
+      console.error('Ошибка сервера:', error)
+      sendJson(res, 500, { error: 'Внутренняя ошибка сервера' })
+    }
+  })
+
+  return { server, db }
+}
 
 // Запуск сервера
-app.listen(PORT, () => {
-  console.log(`Express сервер запущен на порту ${PORT}`)
-})
+async function startServer() {
+  try {
+    const { server, db } = await createServer()
+    
+    server.listen(PORT, () => {
+      console.log(`HTTP сервер запущен на порту ${PORT}`)
+      console.log('Используется SQLite база данных')
+    })
 
-// Обработка закрытия приложения
-process.on('SIGINT', () => {
-  db.close((err) => {
-    if (err) {
-      console.error(err.message)
-    }
-    console.log('Соединение с базой данных закрыто')
-    process.exit(0)
-  })
-}) 
+    // Обработка закрытия приложения
+    process.on('SIGINT', () => {
+      console.log('Закрытие сервера...')
+      server.close(() => {
+        db.close((err) => {
+          if (err) {
+            console.error('Ошибка закрытия базы данных:', err)
+          } else {
+            console.log('База данных закрыта')
+          }
+          console.log('Сервер остановлен')
+          process.exit(0)
+        })
+      })
+    })
+
+  } catch (error) {
+    console.error('Ошибка запуска сервера:', error)
+    process.exit(1)
+  }
+}
+
+// Запуск
+startServer() 

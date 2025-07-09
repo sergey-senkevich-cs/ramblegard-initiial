@@ -85,7 +85,7 @@ import ApiService from './services/api.js'
 export default {
   name: 'App',
   setup() {
-    const title = ref('Electron + Vue.js + Express + SQLite')
+    const title = ref('Electron + Vue.js + SQLite')
     const subtitle = ref('Управление пользователями')
     const error = ref('')
     const success = ref('')
