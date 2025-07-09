@@ -13,9 +13,16 @@ export default defineConfig({
   define: {
     global: 'globalThis',
   },
+  optimizeDeps: {
+    exclude: ['electron']
+  },
   build: {
     rollupOptions: {
-      external: ['electron']
-    }
+      external: ['electron'],
+      output: {
+        format: 'es'
+      }
+    },
+    target: 'esnext'
   }
 }) 

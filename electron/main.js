@@ -37,17 +37,18 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true
     }
   })
 
-  // Load the app
+  // Всегда загружаем собранную версию
+  const htmlPath = path.join(__dirname, '../dist/index.html')
+  mainWindow.loadFile(htmlPath)
+  
+  // Открываем DevTools только в режиме разработки
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 }
 
