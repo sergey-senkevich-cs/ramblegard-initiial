@@ -1,0 +1,72 @@
+{
+  "name": "rabmlegard-electron",
+  "version": "1.0.0",
+  "description": "Electron + Vue.js application with Express.js and SQLite",
+  "main": "electron/main.js",
+  "homepage": "https://github.com/rabmlegard/electron-app",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
+    "start": "concurrently \"npm run server:dev\" \"npm run dev\"",
+    "electron:build": "vite build && electron-builder",
+    "server:dev": "nodemon server/index.js",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "electron",
+    "vue",
+    "desktop",
+    "express",
+    "sqlite"
+  ],
+  "author": "Rabmlegard Team <team@rabmlegard.com>",
+  "license": "ISC",
+  "build": {
+    "appId": "com.rabmlegard.electron",
+    "productName": "Rabmlegard Electron",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      "server/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "maintainer": "Rabmlegard Team <team@rabmlegard.com>",
+      "description": "Desktop application for user management with SQLite database"
+    },
+    "mac": {
+      "target": "dmg"
+    }
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "concurrently": "^8.2.2",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "nodemon": "^3.0.0",
+    "vite": "^5.4.19",
+    "vue": "^3.5.17",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "sqlite3": "^5.1.6",
+    "cors": "^2.8.5"
+  }
+}
